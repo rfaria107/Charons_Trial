@@ -1,0 +1,6 @@
+# Ignore Python venv, caches, and asset working folders
+venv/
+__pycache__/
+assets/sprites/
+assets/sounds/
+assets/story/
