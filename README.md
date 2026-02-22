@@ -1,6 +1,6 @@
 # Charon's Trial
 
-A Greek-mythology auto-battler roguelike built in Python with Pygame. Fight your way through procedurally generated, infinite maps against waves of mythological enemies. Level up, choose divine upgrades, and test your skills in Charon’s labyrinth.
+A Greek-mythology auto-battler roguelike built in Python with Pygame. Fight your way through procedurally generated, infinite maps against waves of mythological enemies. Level up, choose divine upgrades, and test your skills as you cross the greek underworld.
 
 ## Features
 
@@ -19,7 +19,7 @@ A Greek-mythology auto-battler roguelike built in Python with Pygame. Fight your
 1. Clone this repo:  
    `git clone <repo-url>`  
 2. Change to project folder:  
-   `cd vampire_survivors_clone`
+   `cd Charons_Trial`
 3. Create and activate venv (if not present):
    ```bash
    python -m venv .venv
@@ -66,20 +66,15 @@ game/
   ...
 assets/                      - Sprites, sounds, story files
 tests/                       - Pytest tests for all modules
-AGENTS.md                    - Agent roles and OOP module guide
-PROJECT_PLAN.md              - Roadmap and technical design
-STATUS_UPDATE.md             - Progress and session history
-LORE_STYLE.md                - Narrative and art style lore
 ```
 
 ## Greek Myth Theme & Modularity
 
 - All upgrades, enemies, and environments are designed around ancient Greek mythology.
-- Modular agents (Player, Enemy, Wave, Upgrade, UI, Map, Art FX, QA) collaborate via OOP interfaces for extensibility.
 
 ## Contribute
 
-- Fork and PRs welcome; see AGENTS.md for coding conventions
+- Fork and PRs welcome;
 - Do not commit external or proprietary art/sounds—use open source or original creations
 
 ## License
