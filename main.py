@@ -1,7 +1,7 @@
+import os
 import pygame
 
 # Game core loop and orchestration
-import pygame
 from game.player import Player
 from game.ui import HUD
 from game.enemy import Minotaur, Hydra, Cerberus
@@ -9,6 +9,7 @@ from game.enemy import Minotaur, Hydra, Cerberus
 class Game:
     def __init__(self):
         pygame.init()
+        # Use pygame.font for text rendering (pygame.freetype not required)
         pygame.font.init()
         self.screen = pygame.display.set_mode((800, 600))
         pygame.display.set_caption("Charon's Trial")

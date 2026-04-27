@@ -27,7 +27,7 @@ A Greek-mythology auto-battler roguelike built in Python with Pygame. Fight your
    ```
 4. Install dependencies:
    ```bash
-   pip install pygame pytest black flake8
+   pip install -r requirements.txt
    ```
 
 ## Running the Game
