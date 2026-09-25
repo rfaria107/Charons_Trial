@@ -5,3 +5,14 @@ assets/sprites/
 assets/sounds/
 assets/story/
 .*/
+save.json
+save.json.tmp
+skills-lock.json
+coins.txt
+coins.txt.bak
+.venv/
+.pytest_cache/
+*.pyc
+AGENTS.md
+openspec/
+scripts/

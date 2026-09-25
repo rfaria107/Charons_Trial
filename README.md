@@ -14,6 +14,11 @@ A Greek-mythology auto-battler roguelike built in Python with Pygame. Fight your
 - Greek myth themed art, UI, and overlays
 - Coin and XP drop system, main menu, HUD, upgrade picker, game over/restart
 
+- Save migration: the game now uses `save.json` (coins + relics). On first run the game will migrate legacy `coins.txt` into `save.json` and create `coins.txt.bak`.
+
+Shop
+- Access the Relic Shop from the main menu (Shop). Spend coins to buy persistent relics that modify future runs. Purchases are saved to `save.json`.
+
 ## Installation
 
 1. Clone this repo:  

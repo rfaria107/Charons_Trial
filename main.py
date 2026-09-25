@@ -15,7 +15,24 @@ class Game:
         pygame.display.set_caption("Charon's Trial")
         self.clock = pygame.time.Clock()
         self.running = True
+        # Load persistent save state (coins, relics)
+        try:
+            from game.save import load_save
+
+            self._save_state = load_save()
+        except Exception:
+            self._save_state = {"coins": 0, "relics": []}
         self.player = Player(400, 300)
+        # Apply relics from save
+        try:
+            from game.relics import RELICS
+
+            for rid in self._save_state.get("relics", []):
+                relic = RELICS.get(rid)
+                if relic:
+                    relic.apply(self.player)
+        except Exception:
+            pass
         self.hud = HUD(self.player, self.screen.get_width())
         self.enemies = []
         self.xp_drops = []
@@ -27,10 +44,15 @@ class Game:
         self.camera = Camera(self.screen.get_width(), self.screen.get_height())
         self.procedural_map = ProceduralMap(seed=42)
         self.state = "menu"
-        self.menu_options = ["Start Game", "Quit"]
+        self.menu_options = ["Start Game", "Shop", "Quit"]
         self.menu_selected = 0
         self.upgrade_choices = []
         self.upgrade_selected = 0
+        # Cache frequently-used fonts to avoid per-frame creation
+        self.title_font = pygame.font.SysFont("Times New Roman", 40, bold=True)
+        self.small_font = pygame.font.SysFont("Arial", 22)
+        self.upgrade_font = pygame.font.SysFont("Perpetua", 32)
+        # Backwards-compatible coin loading moved to save system; still call load_coins for fallback
         self.load_coins()
 
 
@@ -49,7 +71,22 @@ class Game:
                         if self.menu_selected == 0:
                             self.state = "playing"
                         elif self.menu_selected == 1:
+                            # Shop
+                            self.state = "shop"
+                        elif self.menu_selected == 2:
                             self.running = False
+                elif self.state == "shop":
+                    if event.key == pygame.K_ESCAPE:
+                        self.state = "menu"
+                    elif event.key == pygame.K_UP:
+                        # scroll up menu (optional)
+                        pass
+                    elif event.key == pygame.K_DOWN:
+                        # scroll down menu (optional)
+                        pass
+                    elif event.key == pygame.K_RETURN:
+                        # For keyboard purchase support, we could map selection to index; keep for future
+                        pass
                 elif self.state == "playing":
                     if event.key == pygame.K_ESCAPE:
                         self.state = "paused"
@@ -68,9 +105,54 @@ class Game:
                         self.upgrade_selected = max(self.upgrade_selected - 1, 0)
                     elif event.key == pygame.K_RETURN:
                         chosen = self.upgrade_choices[self.upgrade_selected]
-                        self.player.level_up()  # Increment level/stats
+                        # Level-up already applied when XP was collected; do not call level_up() again
                         self.player.add_upgrade(chosen)
                         self.state = "playing"
+            elif event.type in (pygame.MOUSEMOTION, pygame.MOUSEBUTTONDOWN):
+                if self.state == "level_up":
+                    mx, my = event.pos
+                    # Compute box layout as in draw_upgrade_picker
+                    box_w, box_h = 230, 110
+                    spacing = 30
+                    num_options = len(self.upgrade_choices)
+                    screen_width = self.screen.get_width()
+                    total_group_width = num_options * box_w + (num_options - 1) * spacing
+                    start_x = (screen_width - total_group_width) // 2
+                    y = 200
+                    for idx in range(num_options):
+                        x = start_x + idx * (box_w + spacing)
+                        rect = pygame.Rect(x, y, box_w, box_h)
+                        if rect.collidepoint(mx, my):
+                            self.upgrade_selected = idx
+                            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                                chosen = self.upgrade_choices[self.upgrade_selected]
+                                self.player.add_upgrade(chosen)
+                                self.state = "playing"
+                            break
+                elif self.state == "shop":
+                    mx, my = event.pos
+                    # Determine which buy button was clicked
+                    try:
+                        from game.relics import list_relics, purchase_relic
+                        from game.save import save_state
+                    except Exception:
+                        continue
+                    relics = list_relics()
+                    start_x = 100
+                    y = 140
+                    box_w, box_h = 600, 64
+                    for idx, relic in enumerate(relics):
+                        ry = y + idx * (box_h + 12)
+                        buy_box = pygame.Rect(start_x + box_w - 90, ry + 12, 70, 40)
+                        if buy_box.collidepoint(mx, my) and event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                            # Attempt purchase
+                            if purchase_relic(self._save_state, relic.id):
+                                # Persist immediately
+                                try:
+                                    save_state(self._save_state)
+                                except Exception:
+                                    pass
+                            break
 
     def update(self):
         if self.state == "playing":
@@ -208,6 +290,11 @@ class Game:
             pygame.display.flip()
             return
 
+        if self.state == "shop":
+            self.draw_shop()
+            pygame.display.flip()
+            return
+
         # Draw procedural map as background (world-space tiles offset by camera)
         self.procedural_map.draw(self.screen, self.camera)
 
@@ -236,9 +323,9 @@ class Game:
         overlay = pygame.Surface(self.screen.get_size(), pygame.SRCALPHA)
         overlay.fill((40, 34, 20, 180))  # gold-brown translucent
         self.screen.blit(overlay, (0, 0))
-        font = pygame.font.SysFont("Times New Roman", 40, bold=True)
-        small_font = pygame.font.SysFont("Arial", 22)
-        upgrade_font = pygame.font.SysFont("Perpetua", 32)
+        font = self.title_font
+        small_font = self.small_font
+        upgrade_font = self.upgrade_font
         # Title (centered)
         screen_width = self.screen.get_width()
         title = font.render("CHOOSE YOUR BLESSING", True, (220, 210, 120))
@@ -254,6 +341,9 @@ class Game:
         for idx, upgrade in enumerate(self.upgrade_choices):
             name = upgrade.__class__.__name__
             level = self.player.upgrade_levels.get(name, 0)
+            # Description and one-shot badge if available
+            description = getattr(upgrade, "description", None) or (upgrade.__doc__ or "").strip()
+            one_shot = getattr(upgrade, "apply_once", False)
             x = start_x + idx * (box_w + spacing)
             # Highlight
             box_color = (180, 160, 80) if idx == self.upgrade_selected else (100, 70, 40)
@@ -267,6 +357,20 @@ class Game:
             lvl_text = small_font.render(f"Level: {level}", True, (235,215,40))
             pygame.draw.circle(self.screen, (255,215,40), (x + box_w // 2, y + 75), 22)
             self.screen.blit(lvl_text, (x + box_w // 2 - 25, y + 65))
+            # One-shot badge / description
+            if one_shot:
+                badge = small_font.render("One-shot", True, (220, 220, 220))
+                self.screen.blit(badge, (x + 8, y + 8))
+            if description:
+                desc_lines = []
+                # Naive wrap: split into chunks of ~30 chars
+                s = description
+                while s:
+                    desc_lines.append(s[:30])
+                    s = s[30:]
+                for i, line in enumerate(desc_lines[:2]):
+                    desc_surf = small_font.render(line, True, (230, 230, 210))
+                    self.screen.blit(desc_surf, (x + 10, y + 40 + i * 18))
             # If highlighted, draw effect
             if idx == self.upgrade_selected:
                 pygame.draw.rect(self.screen, (255,225,110), (x-2, y-2, box_w+4, box_h+4), 2, border_radius=18)
@@ -274,6 +378,54 @@ class Game:
         help_text = small_font.render("Left/Right: Move | Enter: Select", True, (255,220,170))
         help_rect = help_text.get_rect(center=(screen_width // 2, 340))
         self.screen.blit(help_text, help_rect.topleft)
+
+
+    def draw_shop(self):
+        # Shop UI overlay
+        overlay = pygame.Surface(self.screen.get_size(), pygame.SRCALPHA)
+        overlay.fill((30, 30, 20, 220))
+        self.screen.blit(overlay, (0, 0))
+        title = self.title_font.render("RELIC SHOP", True, (220, 210, 120))
+        screen_width = self.screen.get_width()
+        self.screen.blit(title, title.get_rect(center=(screen_width // 2, 80)).topleft)
+
+        # List relics
+        try:
+            from game.relics import list_relics
+        except Exception:
+            return
+
+        relics = list_relics()
+        start_x = 100
+        y = 140
+        box_w, box_h = 600, 64
+        for idx, relic in enumerate(relics):
+            x = start_x
+            ry = y + idx * (box_h + 12)
+            owned = relic.id in self._save_state.get("relics", [])
+            # Background
+            pygame.draw.rect(self.screen, (80, 70, 40), (x, ry, box_w, box_h), border_radius=8)
+            pygame.draw.rect(self.screen, (220, 210, 120), (x, ry, box_w, box_h), 2, border_radius=8)
+            # Name and description
+            name_s = self.upgrade_font.render(relic.name, True, (255, 245, 200))
+            self.screen.blit(name_s, (x + 12, ry + 6))
+            desc_s = self.small_font.render(relic.description, True, (230, 230, 210))
+            self.screen.blit(desc_s, (x + 12, ry + 34))
+            # Cost / Owned / Buy
+            if owned:
+                status = self.small_font.render("Owned", True, (180, 180, 180))
+                self.screen.blit(status, (x + box_w - 100, ry + 20))
+            else:
+                cost = self.small_font.render(f"Cost: {relic.cost}", True, (230, 200, 80))
+                self.screen.blit(cost, (x + box_w - 180, ry + 20))
+                buy_box = pygame.Rect(x + box_w - 90, ry + 12, 70, 40)
+                pygame.draw.rect(self.screen, (200, 140, 60), buy_box, border_radius=6)
+                buy_text = self.small_font.render("Buy", True, (20, 20, 20))
+                self.screen.blit(buy_text, (buy_box.x + 12, buy_box.y + 8))
+
+        # Instructions
+        help = self.small_font.render("Esc: Back | Click Buy to purchase", True, (240, 240, 220))
+        self.screen.blit(help, (100, self.screen.get_height() - 40))
 
 
     def run(self):
@@ -292,7 +444,16 @@ class Game:
                     self.update()
                     self.draw()
             self.clock.tick(60)
-        self.save_coins()
+        # Persist save state (coins + relics)
+        try:
+            from game.save import save_state
+
+            # Sync coins into save state
+            self._save_state["coins"] = self.player.coins
+            save_state(self._save_state)
+        except Exception:
+            # Fallback to old coins.txt
+            self.save_coins()
         pygame.quit()
 
     def load_coins(self):
@@ -348,6 +509,10 @@ class Game:
         ]
         self.upgrade_choices = random.sample(pool, k=min(3, len(pool)))
         self.upgrade_selected = 0
+        # Ensure each upgrade has a description attribute for the picker
+        for u in self.upgrade_choices:
+            if not hasattr(u, "description"):
+                u.description = (u.__doc__ or "").strip()
 
     def reset_game(self):
         # Robust reset: reinitialize player, enemies, wave manager, xp drops, coin drops

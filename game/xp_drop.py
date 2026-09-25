@@ -6,8 +6,9 @@ class XPDrop(pygame.sprite.Sprite):
 
     def __init__(self, x, y):
         super().__init__()
-        self.image = pygame.Surface((12, 12)).convert_alpha()
-        self.image.fill((60, 155, 255))  # Small blue square
+        # Use SRCALPHA surface to avoid requiring a display mode for convert_alpha()
+        self.image = pygame.Surface((12, 12), pygame.SRCALPHA)
+        self.image.fill((60, 155, 255, 255))  # Small blue square with alpha
         self.rect = self.image.get_rect(center=(x, y))
         self.collected = False
         self.fade_counter = 0

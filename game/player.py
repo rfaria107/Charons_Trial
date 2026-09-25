@@ -33,6 +33,13 @@ class Player(pygame.sprite.Sprite):
         self._attack_timer = 0
         self.auto_attack_fx = 0       # Visual effect timer for auto attacks
 
+        # Cached surfaces for FX to avoid per-frame Surface creation
+        self._aura_surface = pygame.Surface((self.attack_radius * 2, self.attack_radius * 2), pygame.SRCALPHA)
+        pygame.draw.circle(self._aura_surface, (120, 180, 255, 100), (self.attack_radius, self.attack_radius), self.attack_radius)
+        # Pre-create generic auto attack surface
+        self._aa_surface = pygame.Surface((self.attack_radius * 2, self.attack_radius * 2), pygame.SRCALPHA)
+        pygame.draw.circle(self._aa_surface, (90, 220, 250, 140), (self.attack_radius, self.attack_radius), self.attack_radius)
+
         # Upgrade attributes
         self.upgrades: List[Any] = []
         self.upgrade_levels = {}      # Dict: upgrade name -> stack/level
@@ -155,18 +162,12 @@ class Player(pygame.sprite.Sprite):
         # Determine screen-space position
         draw_rect = camera.apply(self.rect) if camera else self.rect
 
-        aura_color = (120, 180, 255, 100)
-        aura_surface = pygame.Surface((self.attack_radius * 2, self.attack_radius * 2), pygame.SRCALPHA)
-        pygame.draw.circle(aura_surface, aura_color, (self.attack_radius, self.attack_radius), self.attack_radius)
-        aura_rect = aura_surface.get_rect(center=draw_rect.center)
-        screen.blit(aura_surface, aura_rect)
+        aura_rect = self._aura_surface.get_rect(center=draw_rect.center)
+        screen.blit(self._aura_surface, aura_rect)
 
         # Auto attack visual effect
         if self.auto_attack_fx > 0:
-            aa_surface = pygame.Surface((self.attack_radius * 2, self.attack_radius * 2), pygame.SRCALPHA)
-            color = (90, 220, 250, 140)
-            pygame.draw.circle(aa_surface, color, (self.attack_radius, self.attack_radius), self.attack_radius)
-            screen.blit(aa_surface, aura_rect)
+            screen.blit(self._aa_surface, aura_rect)
 
         # Upgrade effect overlay
         if self.upgrade_fx_timer > 0:
